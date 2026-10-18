@@ -31,6 +31,10 @@ resource "azurerm_linux_virtual_machine" "main" {
   network_interface_ids           = [azurerm_network_interface.main.id]
   tags                            = local.tags
 
+  identity {
+    type = "SystemAssigned"
+  }
+
   admin_ssh_key {
     username   = "oluadmin"
     public_key = file(pathexpand("~/.ssh/olu-operations-lab.pub"))
