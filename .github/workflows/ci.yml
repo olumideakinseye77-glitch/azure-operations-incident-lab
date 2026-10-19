@@ -1,0 +1,49 @@
+name: Validate operations lab
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check Python syntax
+        run: python -m compileall -q scripts/python
+
+      - name: Check Bash syntax
+        run: |
+          for script in scripts/bash/*.sh; do
+            bash -n "$script"
+          done
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.16.5"
+
+      - name: Generate temporary validation key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keygen -t ed25519 -N "" -f ~/.ssh/olu-operations-lab
+
+      - name: Check Terraform formatting
+        run: terraform -chdir=terraform fmt -check
+
+      - name: Initialize without Azure backend
+        run: terraform -chdir=terraform init -backend=false -lockfile=readonly
+
+      - name: Validate Terraform
+        run: terraform -chdir=terraform validate
