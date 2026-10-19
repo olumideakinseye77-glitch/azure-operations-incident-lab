@@ -1,0 +1,5 @@
+Syslog
+| where TimeGenerated > ago(24h)
+| where SyslogMessage contains "Project5 ingestion test"
+| project TimeGenerated, Computer, Facility, SeverityLevel, SyslogMessage
+| order by TimeGenerated desc
