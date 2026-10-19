@@ -6,13 +6,109 @@ I built this Azure Cloud Engineering learning lab to challenge myself with Linux
 
 ## Status
 
-Core exercises and monitoring validated on 18–19 October 2026. Infrastructure remains deployed pending cost-control cleanup. A Terraform plan on 19 October reported no changes. GitHub Actions validation passed.
+**Core portfolio lab complete. Live deployment offline.** Exercises and monitoring were validated on 18–19 October 2026. A Terraform plan reported no changes before cleanup, and GitHub Actions validation passed.
+
+On 19 October 2026, Terraform destroyed all 12 tracked resources. Azure returned `false` for the existence of `rg-olu-operations-lab`. The code and recorded evidence remain available here for review. Shared Terraform state storage was retained and can still incur storage charges. The diagrams below describe the tested deployment, not currently running resources.
 
 ## Architecture
 
 An Ubuntu 24.04 VM runs Nginx in UK South. Terraform manages its network, security group, VM, managed identity and monitoring resources using separate remote state in shared Azure Storage. No public inbound access rule is configured; exercises use Azure Run Command and local HTTP checks.
 
 Azure Monitor Agent authenticates with the VM's system-assigned identity. A data collection rule routes local0 syslog messages at Info severity and above to Log Analytics. Agent heartbeat and two labelled syslog messages were verified with KQL.
+
+
+### Runtime and investigation
+
+```mermaid
+flowchart TD
+    OP["Operator in Cloud Shell"] --> RC["Azure Run Command"]
+    subgraph VM["Ubuntu VM in lab subnet"]
+        RC --> TOOLS["Bash diagnostics and Python checker"]
+        TOOLS --> NGINX["Nginx and local HTTP endpoint"]
+        TOOLS --> OS["systemd, journal and filesystem"]
+        LOGGER["Labelled local0 messages"] --> RS["rsyslog"]
+        RS --> AMA["Azure Monitor Agent"]
+        ID["System-assigned identity"] -.-> AMA
+    end
+    DCR["Data collection rule: local0, Info and above"] -.-> AMA
+    AMA --> LAW["Log Analytics: Syslog and Heartbeat"]
+    LAW --> KQL["KQL investigation"]
+```
+
+Nginx log collection is not shown as an ingestion path because it was not configured. The verified Syslog records were deliberately labelled test messages. The Python tool ran on demand through Run Command.
+
+### Infrastructure and validation
+
+```mermaid
+flowchart TD
+    REPO["GitHub: Terraform, scripts and evidence"] --> CI["GitHub Actions: syntax and configuration checks"]
+    REPO --> CLI["Operator runs Terraform in Cloud Shell"]
+    CLI --> STATE["Shared Azure Storage: separate lab state key"]
+    CLI --> INFRA["Lab network, VM, identity and monitoring"]
+    INFRA --> EX["Manual fault exercises"]
+    EX --> EVIDENCE["Reviewed results and incident reports"]
+    EVIDENCE --> REPO
+```
+
+GitHub Actions did not deploy the lab. Terraform applies and incident actions were initiated manually.
+
+## Design choices and alternatives
+
+These choices served the learning goals; they are not claims that one service is best for every workload.
+
+| Choice | Why I used it here | Alternative and trade-off |
+|---|---|---|
+| Azure VM with Ubuntu | I wanted direct practice with Linux services, configuration, journals and filesystems. | App Service or Container Apps would suit a managed application-hosting exercise, but would change the amount of host administration I could practise. |
+| Nginx | A small service gave me a clear local HTTP success/failure signal and configuration-validation command. | A custom Python application would add application-code troubleshooting; that was outside the first service exercises. |
+| Azure Run Command | I could run diagnostics through Azure management access without opening inbound SSH. | SSH would provide an interactive terminal but require a reachable access path and management of the private key. Run Command has latency and is privileged; its permissions need care. |
+| Terraform | I could review plans, track resources in state, detect drift and remove the lab predictably. | Portal or CLI steps are useful for exploration, but require additional work to record and repeat consistently. Nginx installation remained a separate script. |
+| Shared remote state, separate key | Cloud Shell resets did not erase the infrastructure state. | Local state would need durable storage and backups. Shared storage also creates a dependency that must not be deleted during one lab's cleanup. |
+| Bash | It fits Linux command orchestration and service/configuration checks. | Python is more suitable here for structured JSON output and explicit HTTP error handling; I used both for different tasks. |
+| Managed identity for the agent | The monitoring agent could authenticate without me storing a client secret in the scripts. | A secret-based identity introduces credential storage and rotation work. Managed identity still requires appropriate configuration and access control. |
+| Log Analytics and KQL | I could verify messages centrally and filter them by time, machine, facility and text. | Local journal inspection is useful during diagnosis, but the VM must remain accessible and its local logs available. Central ingestion adds configuration, delay and potential costs. |
+| Narrow local0 collection | It let me verify a small, deliberately identifiable data flow. | Broader collection could capture more useful incidents but adds noise and ingestion volume. Nginx log ingestion remains future work. |
+| Isolated tmpfs pressure | It demonstrated capacity checks and recovery without filling the root filesystem. | Persistent-disk pressure would be more representative of some incidents, but needs a separately scoped test and recovery plan. |
+| Human-reviewed AI assistance | I could compare suggestions against actual command output before deciding what to run. | An automated AI remediation service would need a separate design for permissions, validation, auditing and rollback; none was deployed here. |
+| Destroy after testing | The live demonstration was no longer needed once evidence was saved. | Keeping it running supports immediate demos but continues consuming credit or incurring charges. |
+
+## Interview walkthrough
+
+### 1. Establish the infrastructure
+
+I checked regional SKU restrictions, family quota and pricing before deploying. Several older sizes were restricted or lacked quota. I selected D2s_v6 without specifying a zone after finding only a zone-3 restriction and spare family quota. Successful deployment confirmed this attempt; it does not guarantee future capacity.
+
+Terraform created the network, subnet, security group, public IP, network interface and Ubuntu VM. The public IP supported the lab network design, but no public inbound allow rule was added. A future design could review whether a public IP is needed at all and how outbound access should work.
+
+### 2. Establish a healthy baseline
+
+I installed Nginx using the saved Bash script, confirmed active service status and checked HTTP 200 on loopback. Diagnostics also checked configuration syntax, root disk usage and recent service logs. This gave me evidence to compare against a fault.
+
+### 3. Stop, investigate and recover a service
+
+I deliberately stopped Nginx. Diagnostics showed inactive service status and connection refused, while configuration validation still passed and root disk usage remained 8%. I restarted the service and verified both active status and HTTP 200. This separated VM health from application-service health.
+
+### 4. Build and validate a Python check
+
+The Python script combines systemd status with a local HTTP request and emits timestamped JSON. The healthy case returned true with HTTP 200; the stopped-service case returned false, recorded connection refused and exited with code 1. This provides a signal that a future scheduler or pipeline could consume, but no scheduler was implemented.
+
+### 5. Test configuration and filesystem faults safely
+
+I introduced an unknown Nginx directive into a dedicated test file, ran validation and removed the file. I did not reload the bad configuration. A final configuration check and local HTTP request passed.
+
+For capacity pressure, I created a 32 MB tmpfs and wrote 29 MB into it. Usage rose to 91%, producing a console threshold message. Removing the file returned usage to 0%, while root disk usage stayed at 8%. This was a capacity simulation, not a persistent disk outage or Azure alert.
+
+### 6. Verify central monitoring independently
+
+I added the VM identity, Azure Monitor Agent, workspace, collection rule and VM association in Terraform. I first verified agent heartbeat, then separately verified actual Syslog records using KQL. Heartbeat alone was insufficient evidence of message ingestion. Two retry messages appeared in the later query; I did not establish the precise delay.
+
+### 7. Validate, document and clean up
+
+GitHub Actions passed syntax/configuration checks, and the final live Terraform plan showed no drift. I saved incident reports, monitoring evidence and the AI-assistance limitations. I then destroyed 12 lab resources and checked that the project resource group was absent. The separate shared backend was preserved.
+
+### How I would summarise it
+
+“I deployed an Ubuntu incident lab with Terraform, used Bash and Python to diagnose deliberately introduced faults, verified recovery with service and HTTP checks, and confirmed selected logs reached Azure Monitor using KQL. AI helped interpret evidence, while I reviewed and ran the commands. I documented the limits and removed the deployment to control costs.”
+
 
 ## Completed exercises and evidence
 
