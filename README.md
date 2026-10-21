@@ -1,5 +1,8 @@
 # AI-Assisted Azure Operations & Incident Lab
 
+[Portfolio home](https://github.com/olumideakinseye77-glitch/it-cloud-portfolio) · [All Azure projects](https://github.com/olumideakinseye77-glitch/it-cloud-portfolio/tree/main/azure-projects)
+
+
 ## Purpose
 
 I built this Azure Cloud Engineering learning lab to challenge myself with Linux troubleshooting, Python automation and evidence-based incident investigation. Building on my deployment projects, I wanted to practise explaining why a service failed and verifying its recovery.
