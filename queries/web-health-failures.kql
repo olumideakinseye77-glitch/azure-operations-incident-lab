@@ -1,0 +1,4 @@
+Syslog
+| where Facility =~ "local0" and ProcessName == "olu-web-health"
+| where SyslogMessage has "state=unhealthy"
+| project TimeGenerated, Computer, SyslogMessage

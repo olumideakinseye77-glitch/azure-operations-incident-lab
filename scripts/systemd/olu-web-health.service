@@ -1,0 +1,7 @@
+[Unit]
+Description=Check Nginx and report the result to syslog
+
+[Service]
+Type=oneshot
+DynamicUser=yes
+ExecStart=/usr/local/lib/olu-operations/check-web.sh

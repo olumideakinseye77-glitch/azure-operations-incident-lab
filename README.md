@@ -13,6 +13,10 @@ I built this Azure Cloud Engineering learning lab to challenge myself with Linux
 
 On 19 October 2026, Terraform destroyed all 12 tracked resources. Azure returned `false` for the existence of `rg-olu-operations-lab`. The code and recorded evidence remain available here for review. Shared Terraform state storage was retained and can still incur storage charges. The diagrams below describe the tested deployment, not currently running resources.
 
+## Scheduled monitoring extension
+
+The repository includes a systemd timer, a syslog wrapper for the Python health check, and a KQL query for an Azure Monitor log alert. See the [installation and recovery drill](docs/scheduled-monitoring.md). Live alert delivery and recovery verification are pending.
+
 ## Architecture
 
 An Ubuntu 24.04 VM runs Nginx in UK South. Terraform manages its network, security group, VM, managed identity and monitoring resources using separate remote state in shared Azure Storage. No public inbound access rule is configured; exercises use Azure Run Command and local HTTP checks.
@@ -92,7 +96,7 @@ I deliberately stopped Nginx. Diagnostics showed inactive service status and con
 
 ### 4. Build and validate a Python check
 
-The Python script combines systemd status with a local HTTP request and emits timestamped JSON. The healthy case returned true with HTTP 200; the stopped-service case returned false, recorded connection refused and exited with code 1. This provides a signal that a future scheduler or pipeline could consume, but no scheduler was implemented.
+The Python script combines systemd status with a local HTTP request and emits timestamped JSON. The healthy case returned true with HTTP 200; the stopped-service case returned false, recorded connection refused and exited with code 1. This was the on-demand baseline used in the original lab. The scheduled monitoring extension now reuses this checker.
 
 ### 5. Test configuration and filesystem faults safely
 
@@ -174,4 +178,4 @@ For full lab cleanup, review a Terraform destroy plan and apply it, then verify 
 
 ## What I want to learn next
 
-I want to strengthen this lab with scheduled health checks, incident alerts and more robust automated tests. My next planned challenge is an Enterprise Landing Zone and Self-Service Cloud Platform, where I intend to practise reusable Terraform modules, governance and controlled deployments.
+The scheduled monitoring extension is ready for a live alert and recovery drill. My next planned challenge is an Enterprise Landing Zone and Self-Service Cloud Platform, where I intend to practise reusable Terraform modules, governance and controlled deployments.
