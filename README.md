@@ -13,6 +13,16 @@ I built this Azure Cloud Engineering learning lab to challenge myself with Linux
 
 On 19 October 2026, Terraform destroyed all 12 tracked resources. Azure returned `false` for the existence of `rg-olu-operations-lab`. The code and recorded evidence remain available here for review. Shared Terraform state storage was retained and can still incur storage charges. The diagrams below describe the tested deployment, not currently running resources.
 
+## Interview starting point
+
+> I built an Azure Linux lab to practise diagnosing and recovering a web service. I stopped Nginx and reproduced a refused HTTP connection, checked that its configuration was valid, restarted it and verified HTTP 200. I also used Azure Monitor and KQL to prove that selected lab logs reached Log Analytics.
+
+**Why a VM and Nginx?** A VM let me inspect systemd, journald and filesystem behaviour. Nginx gave me a simple HTTP signal and an independent configuration check. For an application whose host I didn't need to administer, I would consider managed hosting.
+
+**What did you verify centrally?** Azure Monitor Agent heartbeat and two labelled Syslog entries. The scheduled health checker and alert query were added later. Live notification delivery and the end-to-end scheduled recovery drill are pending.
+
+[Service choices and trade-offs](#design-choices-and-alternatives) · [Detailed walkthrough](#interview-walkthrough) · [Portfolio interview guide](https://github.com/olumideakinseye77-glitch/it-cloud-portfolio/blob/main/INTERVIEW-GUIDE.md)
+
 ## Scheduled monitoring extension
 
 The repository includes a systemd timer, a syslog wrapper for the Python health check, and a KQL query for an Azure Monitor log alert. See the [installation and recovery drill](docs/scheduled-monitoring.md). Live alert delivery and recovery verification are pending.
